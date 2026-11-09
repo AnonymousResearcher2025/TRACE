@@ -1,0 +1,100 @@
+# Paths and tiers for the paper's experiments (Sec. V-A). Edit data_root only;
+# every other path follows the data-preparation commands in README.md.
+data_root: /data/trace
+k: 10
+target_recall: 0.95
+reps: 5            # repetitions of each replay (median reported)
+warmup: 2000       # leading replay queries excluded from statistics
+tune_queries: 5000 # held-out sessions used to tune L (disjoint from the replay)
+
+tiers:
+  # In-memory: Ego4D frames -> LAION-1M (512-d), hnswlib M=16, efC=200
+  mem_video:
+    type: memory
+    index: ${data_root}/laion/hnsw_1m.bin
+    dim: 512
+    workload: ${data_root}/workloads/video_1m
+    qv_region_model: ${data_root}/laion/qv_region.bin
+    darth_model: ${data_root}/models/darth_mem_video.txt
+    # Derived streams written by scripts/make_streams.py --out ${data_root}/workloads/derived
+    extra_workloads:
+      locality:          # Table VI
+        rho_0_0.125: ${data_root}/workloads/derived/locality/rho_0_0.125
+        rho_0.125_0.25: ${data_root}/workloads/derived/locality/rho_0.125_0.25
+        rho_0.25_0.5: ${data_root}/workloads/derived/locality/rho_0.25_0.5
+        rho_0.5_1: ${data_root}/workloads/derived/locality/rho_0.5_1
+        rho_1_2: ${data_root}/workloads/derived/locality/rho_1_2
+        shuffled: ${data_root}/workloads/derived/locality/shuffled
+      dynamics:          # Table VII
+        natural: ${data_root}/workloads/derived/dynamics/natural
+        alternating: ${data_root}/workloads/derived/dynamics/alternating
+        abrupt: ${data_root}/workloads/derived/dynamics/abrupt
+        oscillating: ${data_root}/workloads/derived/dynamics/oscillating
+        interleaved: ${data_root}/workloads/derived/dynamics/interleaved
+
+  # In-memory: TopiOCQA turns -> Wikipedia-1M (MiniLM, 384-d)
+  mem_dialog:
+    type: memory
+    index: ${data_root}/wiki/hnsw_1m.bin
+    dim: 384
+    workload: ${data_root}/workloads/dialog_1m
+    qv_region_model: ${data_root}/wiki/qv_region.bin
+    darth_model: ${data_root}/models/darth_mem_dialog.txt
+
+  # Disk: Ego4D frames -> LAION-10M, DiskANN layout (R=64, 64-byte PQ), NVMe
+  disk_video:
+    type: disk
+    index: ${data_root}/laion/diskann_10m/ann
+    dim: 512
+    workload: ${data_root}/workloads/video_10m
+    direct_io: true
+    cache_nodes: 16384
+    beam_width: 4
+    qv_region_model: ${data_root}/laion/qv_region.bin
+    darth_model: ${data_root}/models/darth_disk_video.txt
+
+  # Disk: TopiOCQA -> Wikipedia-10M (end-to-end RAG, Table IX)
+  disk_dialog:
+    type: disk
+    index: ${data_root}/wiki/diskann_10m/ann
+    dim: 384
+    workload: ${data_root}/workloads/dialog_10m
+    direct_io: true
+    cache_nodes: 16384
+    beam_width: 4
+
+  # Embedding-width study (Table X, bottom)
+  mem_dialog_768:
+    type: memory
+    index: ${data_root}/wiki/hnsw_1m_768.bin
+    dim: 768
+    workload: ${data_root}/workloads/dialog_1m_768
+  mem_dialog_1536:
+    type: memory
+    index: ${data_root}/wiki/hnsw_1m_1536.bin
+    dim: 1536
+    workload: ${data_root}/workloads/dialog_1m_1536
+
+  # ---- Fidelity checks of the reimplemented baselines (scripts/prep_fidelity.py)
+  # QVCache on its own workload: DEEP-10M, DiskANN backend, generated stream
+  # (10 splits, eta 0.01, 3 repeats, window 4, stride 1), D = 0.075 (paper).
+  fid_qvcache_deep:
+    type: disk
+    index: ${data_root}/deep/diskann_10m/ann
+    dim: 96
+    workload: ${data_root}/workloads/fid_qvcache_deep10m
+    direct_io: true
+    cache_nodes: 16384
+    beam_width: 4
+    qv_region_model: ${data_root}/deep/qv_region.bin
+    fidelity: {kind: qvcache, k: 10, deviation: 0.075}   # L: tuned to target_recall unless set
+
+  # CatapultDB on its own workload: in-memory Vamana over MedCPT PubMed-1M,
+  # 150K uniform queries, k in {1, 16} with list size = k (the paper's k).
+  fid_catapult_pubmed:
+    type: vamana
+    index: ${data_root}/pubmed/vamana_1m/ann
+    vectors: ${data_root}/pubmed/corpus_1000000.fbin
+    dim: 768
+    workload: ${data_root}/workloads/fid_catapult_pubmed1m
+    fidelity: {kind: catapult, ks: [1, 16]}

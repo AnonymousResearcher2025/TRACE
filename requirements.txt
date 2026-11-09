@@ -1,0 +1,12 @@
+# C++ build and experiment harness (every machine).
+numpy>=1.24
+pybind11>=2.11
+hnswlib==0.8.0
+pyyaml
+lightgbm          # DARTH-style baseline
+faiss-cpu         # exact ground truth (scripts fall back to numpy without it)
+#
+# Extras for data preparation and index builds:
+#   GPU host:   torch open_clip_torch pillow datasets transformers sentence-transformers vllm
+#   x86 host:   diskannpy==0.7.0
+#   1536-d:     openai
